@@ -43,15 +43,14 @@ async function getAvailableMembers(
   month: number,
   year: number
 ): Promise<Member[]> {
-  // Determine active group based on Thursday boundaries.
-  // A group is active from Thursday through the following Wednesday.
-  const activeGroup = getActiveGroup(date);
+  // Determine active group based on per-member anchor (Thursday by default, Monday for override members).
 
   // Filter by role/group
   const positionFilter = role === 'chief' ? 'chief' : 'guard';
-  const candidates = members.filter(
-    (m) => m.group === activeGroup && m.position === positionFilter
-  );
+  const candidates = members.filter((m) => {
+    const memberActiveGroup = getMemberActiveGroup(date, m);
+    return m.group === memberActiveGroup && m.position === positionFilter;
+  });
 
   // Filter out members who worked yesterday or tomorrow (no consecutive days)
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -92,23 +91,29 @@ async function getAvailableMembers(
 }
 
 const THURSDAY = 4; // JS Date.getDay(): 0 = Sunday, 4 = Thursday
+const MONDAY = 1; // JS Date.getDay(): 1 = Monday
 
-function getActiveGroup(date: Date): 1 | 2 {
+function getActiveGroupForAnchor(date: Date, anchorDayOfWeek: number): 1 | 2 {
   const normalized = new Date(date);
   normalized.setHours(0, 0, 0, 0);
 
-  // Find the most recent Thursday on or before the given date.
-  const offsetToThursday = (normalized.getDay() - THURSDAY + 7) % 7;
+  const offsetToAnchor = (normalized.getDay() - anchorDayOfWeek + 7) % 7;
   const boundary = new Date(normalized);
-  boundary.setDate(normalized.getDate() - offsetToThursday);
+  boundary.setDate(normalized.getDate() - offsetToAnchor);
 
-  // Anchor the alternating cycle to a fixed Thursday reference.
   const reference = new Date(2026, 0, 1);
   reference.setHours(0, 0, 0, 0);
+  const referenceOffset = (reference.getDay() - anchorDayOfWeek + 7) % 7;
+  const referenceBoundary = new Date(reference);
+  referenceBoundary.setDate(reference.getDate() - referenceOffset);
 
   const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-  const weeksSinceReference = Math.floor((boundary.getTime() - reference.getTime()) / msPerWeek);
+  const weeksSinceReference = Math.floor((boundary.getTime() - referenceBoundary.getTime()) / msPerWeek);
   return weeksSinceReference % 2 === 0 ? 1 : 2;
+}
+
+function getMemberActiveGroup(date: Date, member: Member): 1 | 2 {
+  return getActiveGroupForAnchor(date, member.switchOnMonday ? MONDAY : THURSDAY);
 }
 
 /**

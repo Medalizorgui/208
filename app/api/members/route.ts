@@ -12,6 +12,7 @@ export async function GET() {
         specialty: true,
         position: true,
         group: true,
+        switchOnMonday: true,
       },
     });
     return NextResponse.json(members);
@@ -28,7 +29,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, specialty, position, group } = body;
+    const { name, specialty, position, group, switchOnMonday } = body;
 
     if (!name?.trim() || !specialty?.trim() || !position || !group) {
       return NextResponse.json(
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
         specialty,
         position,
         group: Number(group),
+        switchOnMonday: Boolean(switchOnMonday),
       },
       select: {
         id: true,
@@ -50,6 +52,7 @@ export async function POST(request: Request) {
         specialty: true,
         position: true,
         group: true,
+        switchOnMonday: true,
       },
     });
 

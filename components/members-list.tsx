@@ -1,7 +1,6 @@
 'use client';
 
 import { Member } from '@/lib/types';
-import { Button } from '@/components/ui/button';
 
 interface MembersListProps {
   members: Member[];
@@ -33,11 +32,14 @@ export default function MembersList({ members, onRemove }: MembersListProps) {
                     <p className="text-xs text-slate-500">
                       {member.position === 'chief' ? '👨‍💼' : '👤'} {member.specialty}
                     </p>
+                    {member.switchOnMonday && (
+                      <p className="text-xs text-blue-600">Monday switch enabled</p>
+                    )}
                     <p className="text-xs text-slate-400">position: {member.position}</p>
                   </div>
                   <button
                     onClick={() => onRemove(member.id)}
-                    className="text-red-500 hover:text-red-700 flex-shrink-0 text-sm font-medium"
+                    className="text-red-500 hover:text-red-700 shrink-0 text-sm font-medium"
                   >
                     ✕
                   </button>

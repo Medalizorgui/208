@@ -18,6 +18,7 @@ model Member {
   specialty String   // "Mechanic" | "Deckhands"
   position  String   // "chief" | "guard"
   group     Int      // 1 | 2
+  switchOnMonday Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

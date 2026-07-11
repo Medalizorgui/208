@@ -23,6 +23,7 @@ export async function POST(request: Request) {
         specialty: true,
         position: true,
         group: true,
+        switchOnMonday: true,
       },
     });
 
@@ -49,6 +50,8 @@ export async function POST(request: Request) {
       ...m,
       position: m.position as 'chief' | 'guard',
       group: m.group as 1 | 2
+      ,
+      switchOnMonday: m.switchOnMonday,
     }));
     
     await generateSchedule(

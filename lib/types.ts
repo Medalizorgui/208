@@ -4,6 +4,7 @@ export interface Member {
   specialty: string;
   position: 'chief' | 'guard';
   group: 1 | 2;
+  switchOnMonday: boolean;
 }
 
 export interface ScheduleOverride {

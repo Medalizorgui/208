@@ -15,6 +15,7 @@ interface DayAssignment {
 }
 
 const THURSDAY = 4; // JS Date.getDay(): 0 = Sunday, 4 = Thursday
+const MONDAY = 1;
 
 const getActiveGroup = (date: Date): 1 | 2 => {
   const normalized = new Date(date);
@@ -29,6 +30,29 @@ const getActiveGroup = (date: Date): 1 | 2 => {
   const msPerWeek = 7 * 24 * 60 * 60 * 1000;
   const weeksSinceReference = Math.floor((boundary.getTime() - reference.getTime()) / msPerWeek);
   return weeksSinceReference % 2 === 0 ? 1 : 2;
+};
+
+const getActiveGroupForAnchor = (date: Date, anchorDayOfWeek: number): 1 | 2 => {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+
+  const offsetToAnchor = (normalized.getDay() - anchorDayOfWeek + 7) % 7;
+  const boundary = new Date(normalized);
+  boundary.setDate(normalized.getDate() - offsetToAnchor);
+
+  const reference = new Date(2026, 0, 1);
+  reference.setHours(0, 0, 0, 0);
+  const referenceOffset = (reference.getDay() - anchorDayOfWeek + 7) % 7;
+  const referenceBoundary = new Date(reference);
+  referenceBoundary.setDate(reference.getDate() - referenceOffset);
+
+  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+  const weeksSinceReference = Math.floor((boundary.getTime() - referenceBoundary.getTime()) / msPerWeek);
+  return weeksSinceReference % 2 === 0 ? 1 : 2;
+};
+
+const getMemberActiveGroup = (date: Date, member: Member): 1 | 2 => {
+  return getActiveGroupForAnchor(date, member.switchOnMonday ? MONDAY : THURSDAY);
 };
 
 export default function ScheduleTable({ members }: ScheduleTableProps) {
@@ -53,10 +77,9 @@ export default function ScheduleTable({ members }: ScheduleTableProps) {
   }, [overrides, getDayKey]);
 
   const getAvailableMembers = useCallback((day: number, role: 'chief' | 'guard1' | 'guard2'): Member[] => {
-    const activeGroup = getActiveGroup(new Date(selectedYear, selectedMonth, day));
     const positionFilter = role === 'chief' ? 'chief' : 'guard';
     let candidates = members.filter(
-      m => m.group === activeGroup && m.position === positionFilter
+      (m) => m.position === positionFilter && m.group === getMemberActiveGroup(new Date(selectedYear, selectedMonth, day), m)
     );
 
     // Filter out members who worked yesterday or tomorrow (no consecutive days)

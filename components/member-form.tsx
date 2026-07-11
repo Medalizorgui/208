@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -14,11 +14,13 @@ export default function MemberForm({ onAdd }: MemberFormProps) {
     specialty: string;
     position: 'chief' | 'guard';
     group: 1 | 2;
+    switchOnMonday: boolean;
   }>({
     name: '',
     specialty: '',
     position: 'guard',
     group: 1,
+    switchOnMonday: false,
   });
 
   const specialties = ['Mechanic', 'Deckhands'];
@@ -29,7 +31,7 @@ export default function MemberForm({ onAdd }: MemberFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name.trim() || !formData.specialty.trim()) {
       alert('Please fill in all fields');
       return;
@@ -41,6 +43,7 @@ export default function MemberForm({ onAdd }: MemberFormProps) {
       specialty: '',
       position: 'guard',
       group: 1,
+      switchOnMonday: false,
     });
   };
 
@@ -113,6 +116,19 @@ export default function MemberForm({ onAdd }: MemberFormProps) {
             </label>
           ))}
         </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <input
+          id="switchOnMonday"
+          type="checkbox"
+          checked={formData.switchOnMonday}
+          onChange={(e) => setFormData({ ...formData, switchOnMonday: e.target.checked })}
+          className="w-4 h-4"
+        />
+        <label htmlFor="switchOnMonday" className="text-sm text-slate-700">
+          Use Monday switch for this member
+        </label>
       </div>
 
       <Button type="submit" className="w-full">

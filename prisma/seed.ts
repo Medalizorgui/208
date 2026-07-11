@@ -16,6 +16,7 @@ async function main() {
         specialty: 'Mechanic',
         position: 'chief',
         group: 1,
+        switchOnMonday: false,
       },
     }),
     prisma.member.create({
@@ -24,6 +25,7 @@ async function main() {
         specialty: 'Mechanic',
         position: 'chief',
         group: 1,
+        switchOnMonday: false,
       },
     }),
     // Group 1 - Guards
@@ -33,6 +35,7 @@ async function main() {
         specialty: 'Deckhands',
         position: 'guard',
         group: 1,
+        switchOnMonday: false,
       },
     }),
     prisma.member.create({
@@ -41,6 +44,7 @@ async function main() {
         specialty: 'Deckhands',
         position: 'guard',
         group: 1,
+        switchOnMonday: false,
       },
     }),
     prisma.member.create({
@@ -49,6 +53,7 @@ async function main() {
         specialty: 'Deckhands',
         position: 'guard',
         group: 1,
+        switchOnMonday: true,
       },
     }),
     // Group 2 - Chiefs
@@ -58,6 +63,7 @@ async function main() {
         specialty: 'Mechanic',
         position: 'chief',
         group: 2,
+        switchOnMonday: false,
       },
     }),
     prisma.member.create({
@@ -66,6 +72,7 @@ async function main() {
         specialty: 'Mechanic',
         position: 'chief',
         group: 2,
+        switchOnMonday: false,
       },
     }),
     // Group 2 - Guards
@@ -75,6 +82,7 @@ async function main() {
         specialty: 'Deckhands',
         position: 'guard',
         group: 2,
+        switchOnMonday: false,
       },
     }),
     prisma.member.create({
@@ -83,6 +91,7 @@ async function main() {
         specialty: 'Deckhands',
         position: 'guard',
         group: 2,
+        switchOnMonday: false,
       },
     }),
     prisma.member.create({
@@ -91,6 +100,7 @@ async function main() {
         specialty: 'Deckhands',
         position: 'guard',
         group: 2,
+        switchOnMonday: false,
       },
     }),
   ]);
