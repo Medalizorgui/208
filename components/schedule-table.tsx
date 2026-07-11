@@ -14,6 +14,23 @@ interface DayAssignment {
   guard2: Member | null;
 }
 
+const THURSDAY = 4; // JS Date.getDay(): 0 = Sunday, 4 = Thursday
+
+const getActiveGroup = (date: Date): 1 | 2 => {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+
+  const offsetToThursday = (normalized.getDay() - THURSDAY + 7) % 7;
+  const boundary = new Date(normalized);
+  boundary.setDate(normalized.getDate() - offsetToThursday);
+
+  const reference = new Date(2026, 0, 1);
+  reference.setHours(0, 0, 0, 0);
+  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+  const weeksSinceReference = Math.floor((boundary.getTime() - reference.getTime()) / msPerWeek);
+  return weeksSinceReference % 2 === 0 ? 1 : 2;
+};
+
 export default function ScheduleTable({ members }: ScheduleTableProps) {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -22,7 +39,65 @@ export default function ScheduleTable({ members }: ScheduleTableProps) {
   const [loadingOverrides, setLoadingOverrides] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const getDayKey = (day: number) => `${selectedYear}-${selectedMonth}-${day}`;
+  const getDayKey = useCallback((day: number) => `${selectedYear}-${selectedMonth}-${day}`, [selectedYear, selectedMonth]);
+
+  const didMemberWorkOnDay = useCallback((memberId: string, day: number): boolean => {
+    const dayKey = getDayKey(day);
+    const assignment = overrides[dayKey];
+    if (!assignment) return false;
+    return (
+      assignment.chief === memberId ||
+      assignment.guard1 === memberId ||
+      assignment.guard2 === memberId
+    );
+  }, [overrides, getDayKey]);
+
+  const getAvailableMembers = useCallback((day: number, role: 'chief' | 'guard1' | 'guard2'): Member[] => {
+    const activeGroup = getActiveGroup(new Date(selectedYear, selectedMonth, day));
+    const positionFilter = role === 'chief' ? 'chief' : 'guard';
+    let candidates = members.filter(
+      m => m.group === activeGroup && m.position === positionFilter
+    );
+
+    // Filter out members who worked yesterday or tomorrow (no consecutive days)
+    const previousDay = day - 1;
+    const nextDay = day + 1;
+    candidates = candidates.filter(m => {
+      const workedPrevious = previousDay > 0 && didMemberWorkOnDay(m.id, previousDay);
+      const workedNext = nextDay <= new Date(selectedYear, selectedMonth + 1, 0).getDate() && 
+                         didMemberWorkOnDay(m.id, nextDay);
+      return !workedPrevious && !workedNext;
+    });
+
+    return candidates;
+  }, [members, selectedYear, selectedMonth, didMemberWorkOnDay]);
+
+  // Fetch saved overrides from DB when month/year changes
+  const fetchOverrides = useCallback(async () => {
+    setLoadingOverrides(true);
+    try {
+      const res = await fetch(`/api/schedule?month=${selectedMonth}&year=${selectedYear}`);
+      if (!res.ok) throw new Error('Failed to fetch schedule');
+      const assignments = await res.json();
+
+      const loadedOverrides: Record<string, { chief: string; guard1: string; guard2: string }> = {};
+      for (const assignment of assignments) {
+        const date = new Date(assignment.date);
+        const day = date.getDate();
+        const dayKey = getDayKey(day);
+        loadedOverrides[dayKey] = {
+          chief: assignment.chiefId || '',
+          guard1: assignment.guard1Id || '',
+          guard2: assignment.guard2Id || '',
+        };
+      }
+      setOverrides(loadedOverrides);
+    } catch (error) {
+      console.error('Failed to fetch overrides:', error);
+    } finally {
+      setLoadingOverrides(false);
+    }
+  }, [selectedMonth, selectedYear, getDayKey]);
 
   // Generate schedule for the selected month
   const handleGenerateSchedule = useCallback(async () => {
@@ -51,74 +126,13 @@ export default function ScheduleTable({ members }: ScheduleTableProps) {
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, fetchOverrides]);
 
-  // Fetch saved overrides from DB when month/year changes
-  const fetchOverrides = useCallback(async () => {
-    setLoadingOverrides(true);
-    try {
-      const res = await fetch(`/api/schedule?month=${selectedMonth}&year=${selectedYear}`);
-      if (!res.ok) throw new Error('Failed to fetch schedule');
-      const assignments = await res.json();
-
-      const loadedOverrides: Record<string, { chief: string; guard1: string; guard2: string }> = {};
-      for (const assignment of assignments) {
-        const date = new Date(assignment.date);
-        const day = date.getDate();
-        const dayKey = getDayKey(day);
-        loadedOverrides[dayKey] = {
-          chief: assignment.chiefId || '',
-          guard1: assignment.guard1Id || '',
-          guard2: assignment.guard2Id || '',
-        };
-      }
-      setOverrides(loadedOverrides);
-    } catch (error) {
-      console.error('Failed to fetch overrides:', error);
-    } finally {
-      setLoadingOverrides(false);
-    }
-  }, [selectedMonth, selectedYear]);
-
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     fetchOverrides();
   }, [fetchOverrides]);
-
-  // Helper function to check if a member worked on a specific day
-  const didMemberWorkOnDay = (memberId: string, day: number): boolean => {
-    const dayKey = getDayKey(day);
-    const assignment = overrides[dayKey];
-    if (!assignment) return false;
-    return (
-      assignment.chief === memberId ||
-      assignment.guard1 === memberId ||
-      assignment.guard2 === memberId
-    );
-  };
-
-  // Get available members for a role on a specific day (respects no-consecutive-days rule)
-  const getAvailableMembers = (day: number, role: 'chief' | 'guard1' | 'guard2'): Member[] => {
-    const weekOfMonth = Math.floor((day - 1) / 7);
-    const activeGroup = weekOfMonth % 2 === 0 ? 1 : 2;
-    
-    const positionFilter = role === 'chief' ? 'chief' : 'guard';
-    let candidates = members.filter(
-      m => m.group === activeGroup && m.position === positionFilter
-    );
-
-    // Filter out members who worked yesterday or tomorrow (no consecutive days)
-    const previousDay = day - 1;
-    const nextDay = day + 1;
-    
-    candidates = candidates.filter(m => {
-      const workedPrevious = previousDay > 0 && didMemberWorkOnDay(m.id, previousDay);
-      const workedNext = nextDay <= new Date(selectedYear, selectedMonth + 1, 0).getDate() && 
-                         didMemberWorkOnDay(m.id, nextDay);
-      return !workedPrevious && !workedNext;
-    });
-
-    return candidates;
-  };
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const schedule = useMemo(() => {
     const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
@@ -137,9 +151,6 @@ export default function ScheduleTable({ members }: ScheduleTableProps) {
         assignments.push({ day, chief, guard1, guard2 });
       } else {
         // Auto-assign respecting no-consecutive-days rule
-        const weekOfMonth = Math.floor((day - 1) / 7);
-        const activeGroup = weekOfMonth % 2 === 0 ? 1 : 2;
-        
         const chiefs = getAvailableMembers(day, 'chief');
         const guards = getAvailableMembers(day, 'guard1');
 
@@ -175,7 +186,7 @@ export default function ScheduleTable({ members }: ScheduleTableProps) {
     }
 
     return assignments;
-  }, [members, selectedMonth, selectedYear, overrides]);
+  }, [members, selectedMonth, selectedYear, overrides, getAvailableMembers, getDayKey]);
 
   const handleCellClick = (day: number, role: 'chief' | 'guard1' | 'guard2') => {
     setEditingCell({ day, role });
@@ -303,8 +314,7 @@ export default function ScheduleTable({ members }: ScheduleTableProps) {
               const dayDate = new Date(selectedYear, selectedMonth, assignment.day);
               const isWeekend = dayDate.getDay() === 0 || dayDate.getDay() === 6;
               const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayDate.getDay()];
-              const weekOfMonth = Math.floor((assignment.day - 1) / 7);
-              const activeGroup = weekOfMonth % 2 === 0 ? 1 : 2;
+              const activeGroup = getActiveGroup(new Date(selectedYear, selectedMonth, assignment.day));
 
               return (
                 <tr
@@ -477,7 +487,7 @@ export default function ScheduleTable({ members }: ScheduleTableProps) {
           Click any cell to edit. Members cannot work on consecutive days.
         </p>
         <p>
-          Groups alternate weekly: Week 1, 3, 5... = Group 1 | Week 2, 4, 6... = Group 2
+          Groups alternate every Thursday: Thursday–Wednesday blocks are assigned to alternating groups.
         </p>
       </div>
     </div>
