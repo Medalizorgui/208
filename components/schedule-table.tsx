@@ -1,7 +1,7 @@
 'use client';
 
-import { Member } from '@/app/page';
-import { useMemo, useState } from 'react';
+import { Member } from '@/lib/types';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 
 interface ScheduleTableProps {
   members: Member[];
@@ -19,8 +19,70 @@ export default function ScheduleTable({ members }: ScheduleTableProps) {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [overrides, setOverrides] = useState<Record<string, { chief: string; guard1: string; guard2: string }>>({});
   const [editingCell, setEditingCell] = useState<{ day: number; role: 'chief' | 'guard1' | 'guard2' } | null>(null);
+  const [loadingOverrides, setLoadingOverrides] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const getDayKey = (day: number) => `${selectedYear}-${selectedMonth}-${day}`;
+
+  // Generate schedule for the selected month
+  const handleGenerateSchedule = useCallback(async () => {
+    setIsGenerating(true);
+    try {
+      const res = await fetch('/api/schedule/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          month: selectedMonth,
+          year: selectedYear,
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to generate schedule');
+      }
+
+      // Reload overrides after generation
+      await fetchOverrides();
+      alert('✅ Schedule generated and saved successfully!');
+    } catch (error) {
+      console.error('Failed to generate schedule:', error);
+      alert(`❌ Failed to generate schedule: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [selectedMonth, selectedYear]);
+
+  // Fetch saved overrides from DB when month/year changes
+  const fetchOverrides = useCallback(async () => {
+    setLoadingOverrides(true);
+    try {
+      const res = await fetch(`/api/schedule?month=${selectedMonth}&year=${selectedYear}`);
+      if (!res.ok) throw new Error('Failed to fetch schedule');
+      const assignments = await res.json();
+
+      const loadedOverrides: Record<string, { chief: string; guard1: string; guard2: string }> = {};
+      for (const assignment of assignments) {
+        const date = new Date(assignment.date);
+        const day = date.getDate();
+        const dayKey = getDayKey(day);
+        loadedOverrides[dayKey] = {
+          chief: assignment.chiefId || '',
+          guard1: assignment.guard1Id || '',
+          guard2: assignment.guard2Id || '',
+        };
+      }
+      setOverrides(loadedOverrides);
+    } catch (error) {
+      console.error('Failed to fetch overrides:', error);
+    } finally {
+      setLoadingOverrides(false);
+    }
+  }, [selectedMonth, selectedYear]);
+
+  useEffect(() => {
+    fetchOverrides();
+  }, [fetchOverrides]);
 
   // Helper function to check if a member worked on a specific day
   const didMemberWorkOnDay = (memberId: string, day: number): boolean => {
@@ -119,6 +181,30 @@ export default function ScheduleTable({ members }: ScheduleTableProps) {
     setEditingCell({ day, role });
   };
 
+  // Persist override to DB
+  const saveOverride = async (dayKey: string, overrideData: { chief: string; guard1: string; guard2: string }) => {
+    const parts = dayKey.split('-');
+    const year = parseInt(parts[0]);
+    const month = parseInt(parts[1]);
+    const day = parseInt(parts[2]);
+    const date = new Date(year, month, day);
+
+    try {
+      await fetch('/api/schedule', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: date.toISOString(),
+          chiefId: overrideData.chief || null,
+          guard1Id: overrideData.guard1 || null,
+          guard2Id: overrideData.guard2 || null,
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to save override:', error);
+    }
+  };
+
   const handleMemberSelect = (memberId: string | null) => {
     if (!editingCell) return;
 
@@ -129,14 +215,19 @@ export default function ScheduleTable({ members }: ScheduleTableProps) {
       guard2: schedule.find(a => a.day === editingCell.day)?.guard2?.id || '',
     };
 
-    const updated = { ...overrides };
-    updated[dayKey] = {
+    const updatedAssignment = {
       ...currentAssignment,
       [editingCell.role]: memberId || '',
     };
 
+    const updated = { ...overrides };
+    updated[dayKey] = updatedAssignment;
+
     setOverrides(updated);
     setEditingCell(null);
+
+    // Persist to DB
+    saveOverride(dayKey, updatedAssignment);
   };
 
   const months = [
@@ -147,7 +238,6 @@ export default function ScheduleTable({ members }: ScheduleTableProps) {
   const years = Array.from({ length: 3 }, (_, i) => new Date().getFullYear() - 1 + i);
 
   const formatDate = (day: number) => {
-    const date = new Date(selectedYear, selectedMonth, day);
     const d = String(day).padStart(2, '0');
     const m = String(selectedMonth + 1).padStart(2, '0');
     const y = String(selectedYear).slice(-2);
@@ -160,6 +250,9 @@ export default function ScheduleTable({ members }: ScheduleTableProps) {
       <div className="flex flex-col sm:flex-row gap-4 mb-6 items-start sm:items-center justify-between">
         <h2 className="text-2xl font-bold text-slate-900">
           {months[selectedMonth]} {selectedYear}
+          {loadingOverrides && (
+            <span className="ml-3 text-sm font-normal text-slate-400">Loading...</span>
+          )}
         </h2>
         <div className="flex gap-2">
           <select
@@ -184,6 +277,13 @@ export default function ScheduleTable({ members }: ScheduleTableProps) {
               </option>
             ))}
           </select>
+          <button
+            onClick={handleGenerateSchedule}
+            disabled={isGenerating || members.length < 3}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors"
+          >
+            {isGenerating ? '⏳ Generating...' : '🔄 Generate'}
+          </button>
         </div>
       </div>
 

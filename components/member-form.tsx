@@ -2,18 +2,23 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Member } from '@/app/page';
+import { Member } from '@/lib/types';
 
 interface MemberFormProps {
   onAdd: (member: Omit<Member, 'id'>) => void;
 }
 
 export default function MemberForm({ onAdd }: MemberFormProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    specialty: string;
+    position: 'chief' | 'guard';
+    group: 1 | 2;
+  }>({
     name: '',
     specialty: '',
-    position: 'guard' as const,
-    group: 1 as const,
+    position: 'guard',
+    group: 1,
   });
 
   const specialties = ['Mechanic', 'Deckhands'];

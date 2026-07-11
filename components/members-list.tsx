@@ -1,6 +1,6 @@
 'use client';
 
-import { Member } from '@/app/page';
+import { Member } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 
 interface MembersListProps {
@@ -33,6 +33,7 @@ export default function MembersList({ members, onRemove }: MembersListProps) {
                     <p className="text-xs text-slate-500">
                       {member.position === 'chief' ? '👨‍💼' : '👤'} {member.specialty}
                     </p>
+                    <p className="text-xs text-slate-400">position: {member.position}</p>
                   </div>
                   <button
                     onClick={() => onRemove(member.id)}

@@ -1,34 +1,60 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import MemberForm from '@/components/member-form';
 import ScheduleTable from '@/components/schedule-table';
 import MembersList from '@/components/members-list';
-
-export interface Member {
-  id: string;
-  name: string;
-  specialty: string;
-  position: 'chief' | 'guard';
-  group: 1 | 2;
-}
+import { Member } from '@/lib/types';
 
 export default function Page() {
   const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchMembers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/members');
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setMembers(data);
+    } catch (error) {
+      console.error('Failed to fetch members:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMembers();
+  }, [fetchMembers]);
+
   const [showForm, setShowForm] = useState(false);
 
-  const addMember = (member: Omit<Member, 'id'>) => {
-    const newMember: Member = {
-      ...member,
-      id: `${Date.now()}-${Math.random()}`,
-    };
-    setMembers([...members, newMember]);
-    setShowForm(false);
+  const addMember = async (member: Omit<Member, 'id'>) => {
+    try {
+      const res = await fetch('/api/members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(member),
+      });
+      if (!res.ok) throw new Error('Failed to create');
+      await fetchMembers();
+      setShowForm(false);
+    } catch (error) {
+      console.error('Failed to add member:', error);
+      alert('Failed to add member');
+    }
   };
 
-  const removeMember = (id: string) => {
-    setMembers(members.filter(m => m.id !== id));
+  const removeMember = async (id: string) => {
+    try {
+      const res = await fetch(`/api/members/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete');
+      await fetchMembers();
+    } catch (error) {
+      console.error('Failed to remove member:', error);
+      alert('Failed to remove member');
+    }
   };
 
   return (
@@ -66,7 +92,11 @@ export default function Page() {
               )}
             </div>
 
-            {members.length > 0 && (
+            {loading ? (
+              <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 text-center">
+                <p className="text-slate-500">Loading members...</p>
+              </div>
+            ) : members.length > 0 && (
               <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
                 <h2 className="text-lg font-semibold text-slate-900 mb-4">Members ({members.length})</h2>
                 <MembersList members={members} onRemove={removeMember} />

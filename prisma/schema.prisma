@@ -1,0 +1,42 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Member {
+  id        String   @id @default(cuid())
+  name      String
+  specialty String   // "Mechanic" | "Deckhands"
+  position  String   // "chief" | "guard"
+  group     Int      // 1 | 2
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  chiefAssignments  ScheduleAssignment[] @relation("ChiefMember")
+  guard1Assignments ScheduleAssignment[] @relation("Guard1Member")
+  guard2Assignments ScheduleAssignment[] @relation("Guard2Member")
+}
+
+model ScheduleAssignment {
+  id    String   @id @default(cuid())
+  date  DateTime @unique // The actual calendar date
+  month Int      // 0-11 (JS month index)
+  year  Int
+
+  chiefId  String?
+  guard1Id String?
+  guard2Id String?
+
+  chief  Member? @relation("ChiefMember", fields: [chiefId], references: [id], onDelete: SetNull)
+  guard1 Member? @relation("Guard1Member", fields: [guard1Id], references: [id], onDelete: SetNull)
+  guard2 Member? @relation("Guard2Member", fields: [guard2Id], references: [id], onDelete: SetNull)
+}
